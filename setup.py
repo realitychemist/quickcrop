@@ -6,7 +6,7 @@ setup(
     description="A UI-based method to quickly crop an image to a square using matplotlib by " +
                 "specifying four corners within which to crop.  Meant to be easily integrated " +
                 "into image processing scripts.",
-    url="",
+    url="https://github.com/realitychemist/quickcrop",
     author="Charles Evans",
     author_email="charlese@andrew.cmu.edu",
     license="MPL 2.0",
