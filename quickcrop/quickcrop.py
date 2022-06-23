@@ -99,13 +99,12 @@ def gui_crop(uncropped: ArrayLike,
         with plt.rc_context({"figure.dpi": dpi}):
             fig, ax = plt.subplots()
             plt.axis("off")
-            instructions = "To retry the crop press Del or Backspace, or middle-click anywhere\n" +\
-                           "Otherwise to confrim hit any other button or click anywhere"
+            instructions = "To retry the crop click any mouse button\n" +\
+                           "Otherwise to confrim hit any keyboard button"
             fig.text(0.5, 0.9, instructions, horizontalalignment="center", size="xx-small")
             ax.imshow(cropped, cmap=cmap)
             # Wait for the user to click  to confirm
-            conf_point = plt.ginput(n=1, timeout=conf_timeout)
-            if len(conf_point) == 1:
+            if plt.waitforbuttonpress(timeout=conf_timeout):
                 plt.close(fig)
                 return cropped
 
