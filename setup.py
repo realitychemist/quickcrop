@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name="quickcrop",
-    version="0.1.0",
+    version="0.1.1",
     description="A UI-based method to quickly crop an image to a square using matplotlib by " +
                 "specifying four corners within which to crop.  Meant to be easily integrated " +
                 "into image processing scripts.",
