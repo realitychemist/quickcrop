@@ -1,31 +1,11 @@
 from typing import List, Tuple
-
-
-def __cw_sort(points: List[Tuple[float, float]]):
-    """
-    Parameters
-    ----------
-    points : List[Tuple[float, float]]
-        A list of 2D points which describe a roughly-rectabgular region.  If the region is too far
-        from rectangular, this sort may fail!  Handling this kind of case is not yet implemented.
-
-    Returns
-    -------
-    List[Tuple[float, float]]
-        The list of points, sorted into CW order, starting from the top left-most point.
-
-    """
-    # x-sort the points
-    points.sort(key=lambda x: x[0])
-    lpoints, rpoints = points[:2], points[2:]
-    # Image origin at top left, so y-sort must be reversed to get the expected ordering
-    lpoints.sort(key=lambda y: y[0], reverse=True)
-    rpoints.sort(key=lambda y: y[0], reverse=True)
-    return [lpoints[1], rpoints[0], rpoints[1], lpoints[0]]
+import numpy as np
+from scipy.spatial import ConvexHull
 
 
 def __squarify(points: List[Tuple[float, float]], bias: str):
-    """
+    """Make a rectangular region into a square region.  This function has no input checks!
+
     Parameters
     ----------
     points : List[Tuple[float, float]]
@@ -73,6 +53,40 @@ def __squarify(points: List[Tuple[float, float]], bias: str):
     return points
 
 
+def __biased_round(points: List[Tuple[float, float]], bias: str):
+    """Round floats to integers, ensuring that rounding occurs toward the interior of a
+    rectangular region.  This function has no input checks!
+
+    Parameters
+    ----------
+    points : List[Tuple[float, float]]
+        List of points as (x, y) tuples, where xs and ys are floats.
+    bias : str
+        A string containing exactly one of ["t", "b"] and exactly one of ["l", "r"] which defines
+        the bias direction.
+
+    Returns
+    -------
+    List[Tuple[int, int]]
+        DESCRIPTION.
+
+    """
+    xs = [tup[0] for tup in points]
+    ys = [tup[1] for tup in points]
+
+    if "t" in bias:  # ys round up safely
+        ys = np.ceil(ys)
+    elif "b" in bias:  # ys round down safely
+        ys = np.floor(ys)
+
+    if "l" in bias:  # xs round up safely
+        xs = np.ceil(xs)
+    elif "r" in bias:  # xs round down safely
+        xs = np.floor(xs)
+
+    return list(zip(xs, ys))
+
+
 def minimal_square(points: List[Tuple[float, float]], bias: str = "tl"):
     """
     Parameters
@@ -91,13 +105,16 @@ def minimal_square(points: List[Tuple[float, float]], bias: str = "tl"):
         Non-quadrilateral regions are not yet implemented, so this error will be raised if the list
         of distinct points is not exactly length 4.
     ValueError
-        This error will be raised if an invalid bias string is passed.
+        This error will be raised if an invalid bias string is passed, or if the given points do
+        not form a convex region.
+    RuntimeError
+        Rasied by failed sanity checking; this error should not be raised unless there is a bug.
 
     Returns
     -------
-    List[Tuple[float, float]]
+    List[Tuple[int, int]]
         A list of points describing the minimal square crop solution.  The points will be sorted in
-        clockwise order, starting from the top-leftmost point.
+        clockwise order, starting from the top-leftmost point, and will be integer-valued.
 
     """
     # List of tuple is the default returned from matplotlib.pyplot.ginput,
@@ -109,23 +126,38 @@ def minimal_square(points: List[Tuple[float, float]], bias: str = "tl"):
 
     # Sanity check bias str: must contain exactly one of ["t", "b"], and exactly one of ["l", "r"]
     if ["t" in bias, "b" in bias].count(True) != 1:
-        raise ValueError("Invalidly formatted bias string; "
+        raise ValueError("Invalidly formatted bias string: "
                          "bias string must contain exactly one of 't' or 'b'.")
     if ["l" in bias, "r" in bias].count(True) != 1:
-        raise ValueError("Invalidly formatted bias string; "
+        raise ValueError("Invalidly formatted bias string: "
                          "bias string must contain exactly one of 'l' or 'r'.")
 
-    points = __cw_sort(points)
-    max_ty = max([points[0][1], points[1][1]])
-    min_rx = min([points[1][0], points[2][0]])
-    min_by = min([points[2][1], points[3][1]])
-    max_lx = max([points[3][0], points[0][0]])
+    # Form convex hull from points to ensure convexity
+    hull = ConvexHull(np.asarray(points), incremental=True)
+    verts = hull.vertices
+    sorted_points = [list(points[i]) for i in verts]
+    hull_vertices = [list(hull.points[i]) for i in verts]
+    if not sorted_points == hull_vertices:
+        raise ValueError("Passed points do not form a convex region: "
+                         "minimal square region is undefined on concave regions.")
 
-    minimal_rect = [(max_lx, max_ty),
-                    (min_rx, max_ty),
-                    (min_rx, min_by),
-                    (max_lx, min_by)]
+    sorted_x, sorted_y = sorted([tup[0] for tup in points]), sorted([tup[1] for tup in points])
+    # The following is only guaranteed to work for convex quadrilateral regions
+    minimal_rect = [(sorted_x[1], sorted_y[1]),
+                    (sorted_x[-2], sorted_y[1]),
+                    (sorted_x[-2], sorted_y[-2]),
+                    (sorted_x[1], sorted_y[-2])]
     minsq = __squarify(minimal_rect, bias)
+    # Convert indices to integers for slicing
+    minsq = __biased_round(minsq, bias)
+
+    # Sanity check: the square should be entirely inside the hull, so adding the square's
+    #  points to the hull should not change the vertex list
+    hull.add_points(minsq)
+    if not all(hull.vertices == verts):
+        raise RuntimeError("Sanity check failed: square falls outside convex hull! "
+                           "Please contact chas.s.evans@gmail.com if you encounter this error "
+                           "with details on how to reproduce it.")
     return minsq
 
 

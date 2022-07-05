@@ -88,8 +88,7 @@ def gui_crop(uncropped: ArrayLike,
 
         # If all is well, proceed with cropping
         msq = qcu.minimal_square(corner_points, bias=bias)
-        # Convert from float to integers so we can slice
-        msq = [(int(point[0]), int(point[1])) for point in msq]
+
         minx, maxx = msq[0][0], msq[1][0]
         miny, maxy = msq[0][1], msq[3][1]
 
