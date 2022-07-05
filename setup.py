@@ -12,6 +12,7 @@ setup(
     license="MPL 2.0",
     packages=["quickcrop"],
     install_requires=["numpy",
+                      "scipy",
                       "matplotlib",
                       "typing"],
     classifiers=["Development Status :: 2 - Pre-Alpha",
