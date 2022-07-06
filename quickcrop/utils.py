@@ -53,38 +53,41 @@ def __squarify(points: List[Tuple[float, float]], bias: str):
     return points
 
 
-def __biased_round(points: List[Tuple[float, float]], bias: str):
+def __interior_round(points: List[Tuple[float, float]]):
     """Round floats to integers, ensuring that rounding occurs toward the interior of a
     rectangular region.  This function has no input checks!
 
     Parameters
     ----------
     points : List[Tuple[float, float]]
-        List of points as (x, y) tuples, where xs and ys are floats.
-    bias : str
-        A string containing exactly one of ["t", "b"] and exactly one of ["l", "r"] which defines
-        the bias direction.
+        List of points as (x, y) tuples, where xs and ys are floats; must be ordered clockwise,
+        starting from the top left.
 
     Returns
     -------
     List[Tuple[int, int]]
-        DESCRIPTION.
+        The list of points, rounded to integers in the interior of the above region.
 
     """
-    xs = [tup[0] for tup in points]
-    ys = [tup[1] for tup in points]
+    # Make the data structure mutable
+    tl, tr, br, bl = list(points[0]), list(points[1]), list(points[2]), list(points[3])
 
-    if "t" in bias:  # ys round up safely
-        ys = np.ceil(ys)
-    elif "b" in bias:  # ys round down safely
-        ys = np.floor(ys)
+    # X - round up
+    tl[0] = int(np.ceil(tl[0]))
+    bl[0] = int(np.ceil(bl[0]))
+    # X - round down
+    tr[0] = int(np.floor(tr[0]))
+    br[0] = int(np.floor(tr[0]))
+    # Y - round up
+    tl[1] = int(np.ceil(tl[1]))
+    tr[1] = int(np.ceil(tr[1]))
+    # Y - round down
+    bl[1] = int(np.floor(bl[1]))
+    br[1] = int(np.floor(br[1]))
 
-    if "l" in bias:  # xs round up safely
-        xs = np.ceil(xs)
-    elif "r" in bias:  # xs round down safely
-        xs = np.floor(xs)
-
-    return list(zip(xs, ys))
+    # Turn the points back into immutable tuples; overwrites original list
+    points = [tuple(point) for point in [tl, tr, br, bl]]
+    return points
 
 
 def minimal_square(points: List[Tuple[float, float]], bias: str = "tl"):
@@ -108,7 +111,7 @@ def minimal_square(points: List[Tuple[float, float]], bias: str = "tl"):
         This error will be raised if an invalid bias string is passed, or if the given points do
         not form a convex region.
     RuntimeError
-        Rasied by failed sanity checking; this error should not be raised unless there is a bug.
+        Rasied by failed sanity checking; may be raised if the passed points are highly non-square.
 
     Returns
     -------
@@ -124,7 +127,7 @@ def minimal_square(points: List[Tuple[float, float]], bias: str = "tl"):
         raise NotImplementedError("Exactly four (distinct) points must be passed: "
                                   "current implementation only supports quadrilateral regions.")
 
-    # Sanity check bias str: must contain exactly one of ["t", "b"], and exactly one of ["l", "r"]
+    # Bias string must contain exactly one of ["t", "b"], and exactly one of ["l", "r"]
     if ["t" in bias, "b" in bias].count(True) != 1:
         raise ValueError("Invalidly formatted bias string: "
                          "bias string must contain exactly one of 't' or 'b'.")
@@ -149,15 +152,14 @@ def minimal_square(points: List[Tuple[float, float]], bias: str = "tl"):
                     (sorted_x[1], sorted_y[-2])]
     minsq = __squarify(minimal_rect, bias)
     # Convert indices to integers for slicing
-    minsq = __biased_round(minsq, bias)
+    minsq = __interior_round(minsq)
 
     # Sanity check: the square should be entirely inside the hull, so adding the square's
     #  points to the hull should not change the vertex list
     hull.add_points(minsq)
-    if not all(hull.vertices == verts):
+    if not np.all(hull.vertices == verts):
         raise RuntimeError("Sanity check failed: square falls outside convex hull! "
-                           "Please contact chas.s.evans@gmail.com if you encounter this error "
-                           "with details on how to reproduce it.")
+                           "Was your region highly non-square?")
     return minsq
 
 
