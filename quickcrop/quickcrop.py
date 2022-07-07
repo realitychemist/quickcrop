@@ -3,7 +3,7 @@ import numpy as np
 import os
 import warnings
 import matplotlib.pyplot as plt
-import utils as qcu
+import quickcrop.utils as qcu
 from numpy.typing import ArrayLike
 from numpy import asarray
 
