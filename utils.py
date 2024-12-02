@@ -3,8 +3,8 @@ import numpy as np
 from scipy.spatial import ConvexHull
 
 
-def __squarify(points: List[Tuple[float, float]], bias: str):
-    """Make a rectangular region into a square region.  This function has no input checks!
+def _squarify(points: List[Tuple[float, float]], bias: str):
+    """Make a rectangular region into a square region.
 
     Parameters
     ----------
@@ -22,7 +22,7 @@ def __squarify(points: List[Tuple[float, float]], bias: str):
         The list of points, cropped down to be a square.
 
     """
-    # The square must a side length equal to the smallest
+    # The square must have a side length equal to the smallest
     vlen = points[3][1] - points[0][1]  # Left side length == right side length
     hlen = points[1][0] - points[0][0]  # Top side length == bottom side length
 
@@ -48,14 +48,12 @@ def __squarify(points: List[Tuple[float, float]], bias: str):
             _points[0][0] = points[1][0] - vlen
             _points[3][0] = points[2][0] - vlen
 
-    # Turn the points back into immutable tuples; overwrites original list
-    points = [tuple(point) for point in _points]
-    return points
+    # Turn the points back into immutable tuples
+    return [tuple(point) for point in _points]
 
 
-def __interior_round(points: List[Tuple[float, float]]):
-    """Round floats to integers, ensuring that rounding occurs toward the interior of a
-    rectangular region.  This function has no input checks!
+def _interior_round(points: List[Tuple[float, float]]):
+    """Round floats to integers, ensuring that rounding occurs toward the interior of a rectangular region.
 
     Parameters
     ----------
@@ -70,7 +68,8 @@ def __interior_round(points: List[Tuple[float, float]]):
 
     """
     # Make the data structure mutable
-    tl, tr, br, bl = list(points[0]), list(points[1]), list(points[2]), list(points[3])
+    _points = [list(point) for point in points]
+    tl, tr, br, bl = _points[0], _points[1], _points[2], _points[3]
 
     # X - round up
     tl[0] = int(np.ceil(tl[0]))
@@ -85,22 +84,24 @@ def __interior_round(points: List[Tuple[float, float]]):
     bl[1] = int(np.floor(bl[1]))
     br[1] = int(np.floor(br[1]))
 
-    # Turn the points back into immutable tuples; overwrites original list
-    points = [tuple(point) for point in [tl, tr, br, bl]]
-    return points
+    # Turn the points back into immutable tuples
+    return [tuple(point) for point in [tl, tr, br, bl]]
 
 
-def minimal_square(points: List[Tuple[float, float]], bias: str = "tl"):
+def minimal_rect(points: List[Tuple[float, float]], bias: str = "tl", square: bool = False):
     """
     Parameters
     ----------
     points : List[Tuple[float, float]]
         A list of points, as returned from matplotlib.pyplot.ginput.  Note that if these points
         descirbe a region too different from a rectangle, this funcion MAY SILENTLY FAIL.  Be
-        very careful with such inputs.
+        careful with such inputs.
     bias : str, optional
         A string containing exactly one of ["t", "b"] and exactly one of ["l", "r"] which defines
-        the bias direction (which sides we prefer to keep). The default is "tl".
+        the bias direction (which sides we prefer to keep). Default is "tl".
+    square : bool, optional
+        If False, a rectangular region will be returned. If True, the rectangular region will be further
+        cropped to be square. Defualt is False.
 
     Raises
     ------
@@ -136,13 +137,14 @@ def minimal_square(points: List[Tuple[float, float]], bias: str = "tl"):
                          "bias string must contain exactly one of 'l' or 'r'.")
 
     # Form convex hull from points to ensure convexity
+    # TODO: In the future I can probably use ConvexHull to solve this for non-quad point inputs
     hull = ConvexHull(np.asarray(points), incremental=True)
     verts = hull.vertices
     sorted_points = [list(points[i]) for i in verts]
     hull_vertices = [list(hull.points[i]) for i in verts]
     if not sorted_points == hull_vertices:
         raise ValueError("Passed points do not form a convex region: "
-                         "minimal square region is undefined on concave regions.")
+                         "minimal rectangular region is undefined on concave regions.")
 
     sorted_x, sorted_y = sorted([tup[0] for tup in points]), sorted([tup[1] for tup in points])
     # The following is only guaranteed to work for convex quadrilateral regions
@@ -150,17 +152,20 @@ def minimal_square(points: List[Tuple[float, float]], bias: str = "tl"):
                     (sorted_x[-2], sorted_y[1]),
                     (sorted_x[-2], sorted_y[-2]),
                     (sorted_x[1], sorted_y[-2])]
-    minsq = __squarify(minimal_rect, bias)
-    # Convert indices to integers for slicing
-    minsq = __interior_round(minsq)
+    if square:
+        cropped = _squarify(minimal_rect, bias)
+        # Convert indices to integers for slicing
+        cropped = _interior_round(cropped)
+    else:
+        cropped = _interior_round(minimal_rect)
 
-    # Sanity check: the square should be entirely inside the hull, so adding the square's
+    # Sanity check: the rectangle should be entirely inside the hull, so adding the it's
     #  points to the hull should not change the vertex list
-    hull.add_points(minsq)
+    hull.add_points(cropped)
     if not np.all(hull.vertices == verts):
-        raise RuntimeError("Sanity check failed: square falls outside convex hull! "
-                           "Was your region highly non-square?")
-    return minsq
+        raise RuntimeError("Sanity check failed: cropped falls outside convex hull! "
+                           "Was your region highly non-rectangular?")
+    return cropped
 
 
 # TODO: Use scipy.optimize.minimize to implement a maximal square, with the minimal square as the
